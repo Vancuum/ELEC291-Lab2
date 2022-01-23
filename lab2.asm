@@ -18,7 +18,11 @@ TIMER2_RELOAD EQU ((65536-(CLK/TIMER2_RATE)))
 
 BOOT_BUTTON   equ P4.5
 SOUND_OUT     equ P0.2
-UPDOWN        equ P0.0
+HRS_UP        equ P2.0
+MINS_UP		  equ P2.3
+ALRM_MINS_UP  equ P0.3
+ALRM_HRS_UP   equ P0.6
+ALRM_SET      equ P1.3
 
 ; Reset vector
 org 0x0000
@@ -76,7 +80,8 @@ LCD_D7 equ P3.7
 bseg
 one_second_flag: dbit 1 ; Set to one in the ISR every time 500 ms had passed
 morning_flag: dbit 1 ;Set to one if it is the morning
-alarm_flag: dbit 1 ;Set to one if it the alarm functionality is turned on
+alarm_flag: dbit 1 ;Set to one if the alarm functionality is turned on
+alarm_morning_flag: dbit 1 ;Set to one if the alarm is set to a time in the morning
 
 $NOLIST
 $include(LCD_4bit.inc) ; A library of LCD related functions and utility macros
@@ -207,11 +212,8 @@ inc_hrs:
 	da a
 	mov BCD_hrs, a
 	;Morning flag should be changed whenver the hour hits 12
-	cjne a, #12H, same_morning_flag
+	cjne a, #12H, Timer2_ISR_done
 	cpl morning_flag
-same_morning_flag:
-	sjmp Timer2_ISR_done
-	
 Timer2_ISR_done:
 	pop psw
 	pop acc
@@ -260,6 +262,33 @@ main:
 
 	; After initialization the program stays in this 'forever' loop
 loop:
+	;Check if alarm settings are being adjusted
+	jb HRS_UP, check_mins
+add_hr:
+	mov a, BCD_hrs
+	add a, #0x01
+	da a
+	mov BCD_hrs, a
+	;Morning flag should be changed whenver the hour hits 12
+	cjne a, #12H, check_mins
+	cpl morning_flag
+	
+check_mins:
+	jb MINS_UP, check_alarm_hrs
+	
+	
+	
+	
+check_alarm_hrs:
+
+check_alarm_mins:
+
+check_alarm_set:
+
+
+	
+	
+	;Check for boot
 	jb BOOT_BUTTON, loop_a  ; if the 'BOOT' button is not pressed skip
 	Wait_Milli_Seconds(#50)	; Debounce delay.  This macro is also in 'LCD_4bit.inc'
 	jb BOOT_BUTTON, loop_a  ; if the 'BOOT' button is not pressed skip
@@ -319,7 +348,14 @@ alarm_off:
 	Display_char(#'f')
 	Set_Cursor(2,16)
 	Display_char(#'f')
-
+	
+	;Display alarm AM/PM
+	Set_Cursor(2,12)
+	jb alarm_morning_flag, set_alarm_pm
+	Display_char(#'A')
+set_alarm_pm:
+	Display_char(#'P')
+	
 	;Display AM/PM
 	Set_Cursor(1, 15)
 	jnb morning_flag, set_pm

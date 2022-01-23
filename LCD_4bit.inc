@@ -201,4 +201,22 @@ Display_char mac
 	pop acc
 endmac
 
-	
+;------------------------------------;
+; Increment BCD						 ;
+;------------------------------------;	
+inc_BCD mac
+	push acc
+	mov a, %0
+	cjne a, %1, overflow
+	add a, #0x01
+	sjmp done
+overflow:
+	clr a
+	mov %0, a
+done:
+endmac
+
+
+
+
+

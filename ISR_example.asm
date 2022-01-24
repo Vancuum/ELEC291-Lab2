@@ -103,7 +103,7 @@ Timer0_ISR:
 	;clr TF0  ; According to the data sheet this is done for us already.
 	
 	;Take this line out so I don't get a headache while debugging
-	;cpl SOUND_OUT ; Connect speaker to P0.2
+	cpl SOUND_OUT ; Connect speaker to P0.2
 	reti
 
 ;---------------------------------;

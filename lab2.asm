@@ -88,7 +88,7 @@ $include(LCD_4bit.inc) ; A library of LCD related functions and utility macros
 $LIST
 
 ;                         1234567890123456    <- This helps determine the location of the counter
-Initial_Message_Row1: db 'Time xx:xx:xx X ', 0
+Initial_Message_Row1: db 'Time  xx:xx:xxX ', 0
 Initial_Message_Row2: db 'Alarm xx:xxX xxx', 0
 
 ;---------------------------------;
@@ -162,9 +162,9 @@ Timer2_ISR:
 Inc_Done:
 	; Check if half second has passed
 	mov a, Count1ms+0
-	cjne a, #low(1), Timer2_ISR_done ; Warning: this instruction changes the carry flag!
+	cjne a, #low(1000), Timer2_ISR_done ; Warning: this instruction changes the carry flag!
 	mov a, Count1ms+1
-	cjne a, #high(1), Timer2_ISR_done
+	cjne a, #high(1000), Timer2_ISR_done
 	
 	; 1 second has passed.  Set a flag so the main program knows
 	setb one_second_flag ; Let the main program know one second has passed
@@ -259,13 +259,19 @@ main:
 	setb one_second_flag
 	setb morning_flag
 	clr alarm_flag
+	setb alarm_morning_flag
 
 	; After initialization the program stays in this 'forever' loop
 loop:
-	;Check if alarm settings are being adjusted
+	;Check if LCD screen is being configured
 	jb HRS_UP, check_mins
-add_hr:
+	Wait_Milli_Seconds(#80)
+	jb HRS_UP, check_mins
+check_hr:
 	mov a, BCD_hrs
+	cjne a, #12H, add_hr
+	clr a
+add_hr:
 	add a, #0x01
 	da a
 	mov BCD_hrs, a
@@ -275,20 +281,55 @@ add_hr:
 	
 check_mins:
 	jb MINS_UP, check_alarm_hrs
-	
-	
-	
-	
+	Wait_Milli_Seconds(#80)
+	jb MINS_UP, check_alarm_hrs
+	mov a, BCD_mins
+	cjne a, #59H, add_min
+	clr a
+	mov BCD_mins, a
+	sjmp add_hr
+add_min:
+	add a, #0x01
+	da a
+	mov BCD_mins, a
+		
 check_alarm_hrs:
-
+	jb ALRM_HRS_UP, check_alarm_mins
+	Wait_Milli_Seconds(#80)
+	jb ALRM_HRS_UP, check_alarm_mins
+check_alarm_hr:
+	mov a, alarm_hrs
+	cjne a, #12H, add_alarm_hr
+	clr a
+add_alarm_hr:
+	add a, #0x01
+	da a
+	mov alarm_hrs, a
+	;Morning flag should be changed whenver the hour hits 12
+	cjne a, #12H, check_alarm_mins
+	cpl alarm_morning_flag
+	
 check_alarm_mins:
-
+	jb ALRM_MINS_UP, check_alarm_set
+	Wait_Milli_Seconds(#80)
+	jb ALRM_MINS_UP, check_alarm_set
+	mov a, alarm_mins
+	cjne a, #59H, add_alarm_min
+	clr a
+	mov alarm_mins, a
+	sjmp check_alarm_hr
+add_alarm_min:
+	add a, #0x01
+	da a
+	mov alarm_mins, a
+	
 check_alarm_set:
-
-
+	jb ALRM_SET, check_boot
+	Wait_Milli_Seconds(#80)
+	jb ALRM_SET, check_boot
+	cpl alarm_flag
 	
-	
-	;Check for boot
+check_boot:
 	jb BOOT_BUTTON, loop_a  ; if the 'BOOT' button is not pressed skip
 	Wait_Milli_Seconds(#50)	; Debounce delay.  This macro is also in 'LCD_4bit.inc'
 	jb BOOT_BUTTON, loop_a  ; if the 'BOOT' button is not pressed skip
@@ -318,16 +359,17 @@ check_alarm_set:
 	setb TR2                ; Start timer 2
 	sjmp loop_b             ; Display the new value
 loop_a:
-	jnb one_second_flag, loop
+	jb one_second_flag, loop_b
+	ljmp loop
 loop_b:
     clr one_second_flag ; We clear this flag in the main loop, but it is set in the ISR for timer 2
     
     ;Display current time
-    Set_Cursor(1,6)
+    Set_Cursor(1,7)
 	Display_BCD(BCD_hrs)
-	Set_Cursor(1, 9)
+	Set_Cursor(1, 10)
 	Display_BCD(BCD_mins)
-	Set_Cursor(1, 12)     
+	Set_Cursor(1, 13)     
 	Display_BCD(BCD_secs) 
 
 	;Display alarm time
@@ -343,27 +385,42 @@ loop_b:
 	jnb alarm_flag, alarm_off
 	Display_char(#'n')
 	Set_Cursor(2,16)
-	Display_char(#' ' )
+	Display_char(#' ')
+	sjmp display_AP_alarm
 alarm_off:
 	Display_char(#'f')
 	Set_Cursor(2,16)
 	Display_char(#'f')
 	
-	;Display alarm AM/PM
+display_AP_alarm:
 	Set_Cursor(2,12)
-	jb alarm_morning_flag, set_alarm_pm
+	jnb alarm_morning_flag, set_alarm_pm
 	Display_char(#'A')
+	sjmp display_AP
 set_alarm_pm:
 	Display_char(#'P')
 	
-	;Display AM/PM
+display_AP:	
 	Set_Cursor(1, 15)
 	jnb morning_flag, set_pm
 	Display_char(#'A')
-	sjmp continue
+	sjmp check_alarm_sound
 set_pm:
 	Display_char(#'P')
-
+	
+check_alarm_sound:
+	clr c
+	mov a, morning_flag
+	cjne a, alarm_morning_flag, continue
+	jnz continue
+	clr c
+	mov a, BCD_mins
+	cjne a, alarm_mins, continue
+	clr c
+	mov a, BCD_hrs
+	cjne a, alarm_hrs, continue
+	jnb alarm_flag, continue
+	setb SOUND_OUT ;Connect speaker to P0.2 
 continue:
     ljmp loop
 END

@@ -48,7 +48,7 @@
 0024             50            
 0024             51   ; Timer/Counter 2 overflow interrupt vector
 002B             52   org 0x002B
-002B 02012F      53            ljmp Timer2_ISR
+002B 020131      53            ljmp Timer2_ISR
 002E             54            
 002E             55   
 002E             56   ; In the 8051 we can define direct access variables starting at location 0x30 up to location 0x7F
@@ -111,7 +111,7 @@
 010D 75F2E8     107            mov RL0, #low(TIMER0_RELOAD)
 0110            108            ; Enable the timer and interrupts
 0110 D2A9       109       setb ET0  ; Enable timer 0 interrupt
-0112 D28C       110       setb TR0  ; Start timer 0
+0112 C28C       110       clr TR0  ;Don't want timer to start right away
 0114 22         111            ret
 0115            112            
 0115            113   ;---------------------------------;
@@ -123,56 +123,56 @@
 0115            119            ;clr TF0  ; According to the data sheet this is done for us already.
 0115            120            
 0115            121            ;Take this line out so I don't get a headache while debugging
-0115            122            ;cpl SOUND_OUT ; Connect speaker to P0.2
-0115 32         123            reti
-0116            124            
-0116            125   ;---------------------------------;
-0116            126   ; Routine to initialize the ISR   ;
-0116            127   ; for timer 2                     ;
-0116            128   ;---------------------------------;
-0116            129   Timer2_Init:
-0116 75C800     130            mov T2CON, #0 ; Stop timer/counter.  Autoreload mode.
-0119 75CDA9     131            mov TH2, #high(TIMER2_RELOAD)
-011C 75CC9A     132            mov TL2, #low(TIMER2_RELOAD)
-011F            133            ; Set the reload value
-011F 75CBA9     134            mov RCAP2H, #high(TIMER2_RELOAD)
-0122 75CA9A     135            mov RCAP2L, #low(TIMER2_RELOAD)
-0125            136            ; Init One millisecond interrupt counter.  It is a 16-bit variable made with two 8-bit parts
-0125 E4         137            clr a
-0126 F530       138            mov Count1ms+0, a
-0128 F531       139            mov Count1ms+1, a
-012A            140            ; Enable the timer and interrupts
-012A D2AD       141       setb ET2  ; Enable timer 2 interrupt
-012C D2CA       142       setb TR2  ; Enable timer 2
-012E 22         143            ret
-012F            144            
-012F            145   ;---------------------------------;
-012F            146   ; ISR for timer 2                 ;
-012F            147   ;---------------------------------;
-012F            148   Timer2_ISR:
-012F C2CF       149            clr TF2  ; Timer 2 doesn't clear TF2 automatically. Do it in ISR
-0131 B290       150            cpl P1.0 ; To check the interrupt rate with oscilloscope. It must be precisely a 1 ms pulse.
-0133            151            
-0133            152            ; The two registers used in the ISR must be saved in the stack
-0133 C0E0       153            push acc
-0135 C0D0       154            push psw
-0137            155            
-0137            156            ; Increment the 16-bit one mili second counter
-0137 0530       157            inc Count1ms+0    ; Increment the low 8-bits first
-0139 E530       158            mov a, Count1ms+0 ; If the low 8-bits overflow, then increment high 8-bits
-013B 7002       159            jnz Inc_Done
-013D 0531       160            inc Count1ms+1
-013F            161            
-013F            162   Inc_Done:
-013F            163            ; Check if half second has passed
-013F E530       164            mov a, Count1ms+0
-0141 B4E83E     165            cjne a, #low(1000), Timer2_ISR_done ; Warning: this instruction changes the carry flag!
-0144 E531       166            mov a, Count1ms+1
-0146 B40339     167            cjne a, #high(1000), Timer2_ISR_done
-0149            168            
-0149            169            ; 1 second has passed.  Set a flag so the main program knows
-0149 D200       170            setb one_second_flag ; Let the main program know one second has passed
-014B B28C       171            cpl TR0 ; Enable/disable timer/counter 0. This line creates a beep-silence-beep-silence sound.
+0115 B282       122            cpl SOUND_OUT ; Connect speaker to P0.2
+0117 32         123            reti
+0118            124            
+0118            125   ;---------------------------------;
+0118            126   ; Routine to initialize the ISR   ;
+0118            127   ; for timer 2                     ;
+0118            128   ;---------------------------------;
+0118            129   Timer2_Init:
+0118 75C800     130            mov T2CON, #0 ; Stop timer/counter.  Autoreload mode.
+011B 75CDA9     131            mov TH2, #high(TIMER2_RELOAD)
+011E 75CC9A     132            mov TL2, #low(TIMER2_RELOAD)
+0121            133            ; Set the reload value
+0121 75CBA9     134            mov RCAP2H, #high(TIMER2_RELOAD)
+0124 75CA9A     135            mov RCAP2L, #low(TIMER2_RELOAD)
+0127            136            ; Init One millisecond interrupt counter.  It is a 16-bit variable made with two 8-bit parts
+0127 E4         137            clr a
+0128 F530       138            mov Count1ms+0, a
+012A F531       139            mov Count1ms+1, a
+012C            140            ; Enable the timer and interrupts
+012C D2AD       141       setb ET2  ; Enable timer 2 interrupt
+012E D2CA       142       setb TR2  ; Enable timer 2
+0130 22         143            ret
+0131            144            
+0131            145   ;---------------------------------;
+0131            146   ; ISR for timer 2                 ;
+0131            147   ;---------------------------------;
+0131            148   Timer2_ISR:
+0131 C2CF       149            clr TF2  ; Timer 2 doesn't clear TF2 automatically. Do it in ISR
+0133 B290       150            cpl P1.0 ; To check the interrupt rate with oscilloscope. It must be precisely a 1 ms pulse.
+0135            151            
+0135            152            ; The two registers used in the ISR must be saved in the stack
+0135 C0E0       153            push acc
+0137 C0D0       154            push psw
+0139            155            
+0139            156            ; Increment the 16-bit one mili second counter
+0139 0530       157            inc Count1ms+0    ; Increment the low 8-bits first
+013B E530       158            mov a, Count1ms+0 ; If the low 8-bits overflow, then increment high 8-bits
+013D 7002       159            jnz Inc_Done
+013F 0531       160            inc Count1ms+1
+0141            161            
+0141            162   Inc_Done:
+0141            163            ; Check if half second has passed
+0141 E530       164            mov a, Count1ms+0
+0143 B4E83C     165            cjne a, #low(1000), Timer2_ISR_done ; Warning: this instruction changes the carry flag!
+0146 E531       166            mov a, Count1ms+1
+0148 B40337     167            cjne a, #high(1000), Timer2_ISR_done
+014B            168            
+014B            169            ; 1 second has passed.  Set a flag so the main program knows
+014B D200       170            setb one_second_flag ; Let the main program know one second has passed
+014D            171            
 014D            172            ; Reset to zero the milli-seconds counter, it is a 16-bit variable
 014D E4         173            clr a
 014E F530       174            mov Count1ms+0, a
@@ -232,7 +232,7 @@
 0187            228            ; Initialization
 0187 75817F     229       mov SP, #0x7F
 018A 1200FC     230       lcall Timer0_Init
-018D 120116     231       lcall Timer2_Init
+018D 120118     231       lcall Timer2_Init
 0190            232       ; In case you decide to use the pins of P0, configure the port in bidirectional mode:
 0190 75E600     233       mov P0M0, #0
 0193 75E700     234       mov P0M1, #0
@@ -284,18 +284,18 @@
 01E6            258            ;Initialize flags. Default is morning, alarm off
 01E6 D200       259            setb one_second_flag
 01E8 D201       260            setb morning_flag
-01EA C202       261            clr alarm_flag
-01EC D203       262            setb alarm_morning_flag
+01EA D203       261            setb alarm_morning_flag
+01EC C202       262            clr alarm_flag
 01EE            263   
 01EE            264            ; After initialization the program stays in this 'forever' loop
 01EE            265   loop:
 01EE            266            ;Check if LCD screen is being configured
-01EE 20A01C     267            jb HRS_UP, check_mins
+01EE 20A01F     267            jb HRS_UP, check_mins
 01F1 C002       268            push AR2
 01F3 7A50       268            mov R2, #80
 01F5 120039     268            lcall ?Wait_Milli_Seconds
 01F8 D002       268            pop AR2
-01FA 20A010     269            jb HRS_UP, check_mins
+01FA 20A013     269            jb HRS_UP, check_mins
 01FD            270   check_hr:
 01FD E532       271            mov a, BCD_hrs
 01FF B41201     272            cjne a, #12H, add_hr
@@ -305,252 +305,261 @@
 0205 D4         276            da a
 0206 F532       277            mov BCD_hrs, a
 0208            278            ;Morning flag should be changed whenver the hour hits 12
-0208 B41202     279            cjne a, #12H, check_mins
+0208 B41202     279            cjne a, #12H, jump
 020B B201       280            cpl morning_flag
-020D            281            
-020D            282   check_mins:
-020D 20A31B     283            jb MINS_UP, check_alarm_hrs
-0210 C002       284            push AR2
-0212 7A50       284            mov R2, #80
-0214 120039     284            lcall ?Wait_Milli_Seconds
-0217 D002       284            pop AR2
-0219 20A30F     285            jb MINS_UP, check_alarm_hrs
-021C E534       286            mov a, BCD_mins
-021E B45905     287            cjne a, #59H, add_min
-0221 E4         288            clr a
-0222 F534       289            mov BCD_mins, a
-0224 80DD       290            sjmp add_hr
-0226            291   add_min:
-0226 2401       292            add a, #0x01
-0228 D4         293            da a
-0229 F534       294            mov BCD_mins, a
-022B            295                    
-022B            296   check_alarm_hrs:
-022B 20861C     297            jb ALRM_HRS_UP, check_alarm_mins
-022E C002       298            push AR2
-0230 7A50       298            mov R2, #80
-0232 120039     298            lcall ?Wait_Milli_Seconds
-0235 D002       298            pop AR2
-0237 208610     299            jb ALRM_HRS_UP, check_alarm_mins
-023A            300   check_alarm_hr:
-023A E535       301            mov a, alarm_hrs
-023C B41201     302            cjne a, #12H, add_alarm_hr
-023F E4         303            clr a
-0240            304   add_alarm_hr:
-0240 2401       305            add a, #0x01
-0242 D4         306            da a
-0243 F535       307            mov alarm_hrs, a
-0245            308            ;Morning flag should be changed whenver the hour hits 12
-0245 B41202     309            cjne a, #12H, check_alarm_mins
-0248 B203       310            cpl alarm_morning_flag
-024A            311            
-024A            312   check_alarm_mins:
-024A 20831B     313            jb ALRM_MINS_UP, check_alarm_set
-024D C002       314            push AR2
-024F 7A50       314            mov R2, #80
-0251 120039     314            lcall ?Wait_Milli_Seconds
-0254 D002       314            pop AR2
-0256 20830F     315            jb ALRM_MINS_UP, check_alarm_set
-0259 E536       316            mov a, alarm_mins
-025B B45905     317            cjne a, #59H, add_alarm_min
-025E E4         318            clr a
-025F F536       319            mov alarm_mins, a
-0261 80D7       320            sjmp check_alarm_hr
-0263            321   add_alarm_min:
-0263 2401       322            add a, #0x01
-0265 D4         323            da a
-0266 F536       324            mov alarm_mins, a
-0268            325            
-0268            326   check_alarm_set:
-0268 20930E     327            jb ALRM_SET, check_boot
-026B C002       328            push AR2
-026D 7A50       328            mov R2, #80
-026F 120039     328            lcall ?Wait_Milli_Seconds
-0272 D002       328            pop AR2
-0274 209302     329            jb ALRM_SET, check_boot
-0277 B202       330            cpl alarm_flag
-0279            331            
-0279            332   check_boot:
-0279 20C528     333            jb BOOT_BUTTON, loop_a  ; if the 'BOOT' button is not pressed skip
-027C C002       334            push AR2
-027E 7A32       334            mov R2, #50
-0280 120039     334            lcall ?Wait_Milli_Seconds
-0283 D002       334            pop AR2         ; Debounce delay.  This macro is also in 'LCD_4bit.inc'
-0285 20C51C     335            jb BOOT_BUTTON, loop_a  ; if the 'BOOT' button is not pressed skip
-0288 30C5FD     336            jnb BOOT_BUTTON, $              ; Wait for button release.  The '$' means: jump to same instruction.
-028B            337            ; A valid press of the 'BOOT' button has been detected, reset the BCD counter.
-028B            338            ; But first stop timer 2 and reset the milli-seconds counter, to resync everything.
-028B C2CA       339            clr TR2                 ; Stop timer 2
-028D E4         340            clr a
-028E            341            
-028E            342            ;Reset milliseconds counter
-028E F530       343            mov Count1ms+0, a
-0290 F531       344            mov Count1ms+1, a
-0292            345            
-0292            346            ;Reset current time
-0292 F533       347            mov BCD_secs, a
-0294 F534       348            mov BCD_mins, a
-0296 F532       349            mov BCD_hrs, a
-0298            350            
-0298            351            ;Reset alarm time
-0298 F535       352            mov alarm_hrs, a
-029A F536       353            mov alarm_mins, a
-029C            354            
-029C            355            ;Reset flags
-029C D201       356            setb morning_flag
-029E C202       357            clr alarm_flag
-02A0            358            
-02A0 D2CA       359            setb TR2                ; Start timer 2
-02A2 8006       360            sjmp loop_b             ; Display the new value
-02A4            361   loop_a:
-02A4 200003     362            jb one_second_flag, loop_b
-02A7 0201EE     363            ljmp loop
-02AA            364   loop_b:
-02AA C200       365       clr one_second_flag ; We clear this flag in the main loop, but it is set in the ISR for timer 2
-02AC            366       
-02AC            367       ;Display current time
-02AC C0E0       368            push acc
-02AE 7407       368            mov a, #7
-02B0 14         368            dec a
-02B1 1200BF     368            lcall ?Set_Cursor_1 ; Select column and row
-02B4 D0E0       368            pop acc
-02B6 C000       369            push ar0
-02B8 A832       369            mov r0, BCD_hrs
-02BA 1200C4     369            lcall ?Display_BCD
-02BD D000       369            pop ar0
-02BF C0E0       370            push acc
-02C1 740A       370            mov a, #10
-02C3 14         370            dec a
-02C4 1200BF     370            lcall ?Set_Cursor_1 ; Select column and row
-02C7 D0E0       370            pop acc
-02C9 C000       371            push ar0
-02CB A834       371            mov r0, BCD_mins
-02CD 1200C4     371            lcall ?Display_BCD
-02D0 D000       371            pop ar0
-02D2 C0E0       372            push acc
-02D4 740D       372            mov a, #13
-02D6 14         372            dec a
-02D7 1200BF     372            lcall ?Set_Cursor_1 ; Select column and row
-02DA D0E0       372            pop acc     
-02DC C000       373            push ar0
-02DE A833       373            mov r0, BCD_secs
-02E0 1200C4     373            lcall ?Display_BCD
-02E3 D000       373            pop ar0 
-02E5            374   
-02E5            375            ;Display alarm time
-02E5 C0E0       376            push acc
-02E7 7407       376            mov a, #7
-02E9 14         376            dec a
-02EA 1200BD     376            lcall ?Set_Cursor_2 ; Select column and row
-02ED D0E0       376            pop acc
-02EF C000       377            push ar0
-02F1 A835       377            mov r0, alarm_hrs
-02F3 1200C4     377            lcall ?Display_BCD
-02F6 D000       377            pop ar0
-02F8 C0E0       378            push acc
-02FA 740A       378            mov a, #10
-02FC 14         378            dec a
-02FD 1200BD     378            lcall ?Set_Cursor_2 ; Select column and row
-0300 D0E0       378            pop acc
-0302 C000       379            push ar0
-0304 A836       379            mov r0, alarm_mins
-0306 1200C4     379            lcall ?Display_BCD
-0309 D000       379            pop ar0
-030B            380            
-030B            381            ;Display alarm on/off
-030B C0E0       382            push acc
-030D 740E       382            mov a, #14
-030F 14         382            dec a
-0310 1200BD     382            lcall ?Set_Cursor_2 ; Select column and row
-0313 D0E0       382            pop acc
-0315 C0E0       383            push acc
-0317 746F       383            mov a, #'o'
-0319 12007E     383            lcall ?WriteData
-031C D0E0       383            pop acc
-031E C0E0       384            push acc
-0320 740F       384            mov a, #15
-0322 14         384            dec a
-0323 1200BD     384            lcall ?Set_Cursor_2 ; Select column and row
-0326 D0E0       384            pop acc
-0328 30021E     385            jnb alarm_flag, alarm_off
-032B C0E0       386            push acc
-032D 746E       386            mov a, #'n'
-032F 12007E     386            lcall ?WriteData
-0332 D0E0       386            pop acc
-0334 C0E0       387            push acc
-0336 7410       387            mov a, #16
-0338 14         387            dec a
-0339 1200BD     387            lcall ?Set_Cursor_2 ; Select column and row
-033C D0E0       387            pop acc
-033E C0E0       388            push acc
-0340 7420       388            mov a, #' '
-0342 12007E     388            lcall ?WriteData
-0345 D0E0       388            pop acc
-0347 801C       389            sjmp display_AP_alarm
-0349            390   alarm_off:
-0349 C0E0       391            push acc
-034B 7466       391            mov a, #'f'
-034D 12007E     391            lcall ?WriteData
-0350 D0E0       391            pop acc
-0352 C0E0       392            push acc
-0354 7410       392            mov a, #16
-0356 14         392            dec a
-0357 1200BD     392            lcall ?Set_Cursor_2 ; Select column and row
-035A D0E0       392            pop acc
-035C C0E0       393            push acc
-035E 7466       393            mov a, #'f'
-0360 12007E     393            lcall ?WriteData
-0363 D0E0       393            pop acc
-0365            394            
-0365            395   display_AP_alarm:
-0365 C0E0       396            push acc
-0367 740C       396            mov a, #12
-0369 14         396            dec a
-036A 1200BD     396            lcall ?Set_Cursor_2 ; Select column and row
-036D D0E0       396            pop acc
-036F 30030B     397            jnb alarm_morning_flag, set_alarm_pm
-0372 C0E0       398            push acc
-0374 7441       398            mov a, #'A'
-0376 12007E     398            lcall ?WriteData
-0379 D0E0       398            pop acc
-037B 8009       399            sjmp display_AP
-037D            400   set_alarm_pm:
-037D C0E0       401            push acc
-037F 7450       401            mov a, #'P'
-0381 12007E     401            lcall ?WriteData
-0384 D0E0       401            pop acc
-0386            402            
-0386            403   display_AP:      
-0386 C0E0       404            push acc
-0388 740F       404            mov a, #15
-038A 14         404            dec a
-038B 1200BF     404            lcall ?Set_Cursor_1 ; Select column and row
-038E D0E0       404            pop acc
-0390 30010B     405            jnb morning_flag, set_pm
-0393 C0E0       406            push acc
-0395 7441       406            mov a, #'A'
-0397 12007E     406            lcall ?WriteData
-039A D0E0       406            pop acc
-039C 8009       407            sjmp check_alarm_sound
-039E            408   set_pm:
-039E C0E0       409            push acc
-03A0 7450       409            mov a, #'P'
-03A2 12007E     409            lcall ?WriteData
-03A5 D0E0       409            pop acc
-03A7            410            
-03A7            411   check_alarm_sound:
-03A7 C3         412            clr c
-03A8 E501       413            mov a, morning_flag
-03AA B50313     414            cjne a, alarm_morning_flag, continue
-03AD 7011       415            jnz continue
-03AF C3         416            clr c
-03B0 E534       417            mov a, BCD_mins
-03B2 B5360B     418            cjne a, alarm_mins, continue
-03B5 C3         419            clr c
-03B6 E532       420            mov a, BCD_hrs
-03B8 B53505     421            cjne a, alarm_hrs, continue
-03BB 300202     422            jnb alarm_flag, continue
-03BE D282       423            setb SOUND_OUT ;Connect speaker to P0.2 
-03C0            424   continue:
-03C0 0201EE     425       ljmp loop
-03C3            426   EN
+020D            281   jump:
+020D 0202B8     282            ljmp display
+0210            283            
+0210            284   check_mins:
+0210 20A31E     285            jb MINS_UP, check_alarm_hrs
+0213 C002       286            push AR2
+0215 7A50       286            mov R2, #80
+0217 120039     286            lcall ?Wait_Milli_Seconds
+021A D002       286            pop AR2
+021C 20A312     287            jb MINS_UP, check_alarm_hrs
+021F E534       288            mov a, BCD_mins
+0221 B45905     289            cjne a, #59H, add_min
+0224 E4         290            clr a
+0225 F534       291            mov BCD_mins, a
+0227 80DA       292            sjmp add_hr
+0229            293   add_min:
+0229 2401       294            add a, #0x01
+022B D4         295            da a
+022C F534       296            mov BCD_mins, a
+022E 0202B8     297            ljmp display
+0231            298                    
+0231            299   check_alarm_hrs:
+0231 20861E     300            jb ALRM_HRS_UP, check_alarm_mins
+0234 C002       301            push AR2
+0236 7A50       301            mov R2, #80
+0238 120039     301            lcall ?Wait_Milli_Seconds
+023B D002       301            pop AR2
+023D 208612     302            jb ALRM_HRS_UP, check_alarm_mins
+0240            303   check_alarm_hr:
+0240 E535       304            mov a, alarm_hrs
+0242 B41201     305            cjne a, #12H, add_alarm_hr
+0245 E4         306            clr a
+0246            307   add_alarm_hr:
+0246 2401       308            add a, #0x01
+0248 D4         309            da a
+0249 F535       310            mov alarm_hrs, a
+024B            311            ;Morning flag should be changed whenver the hour hits 12
+024B B4126A     312            cjne a, #12H, display
+024E B203       313            cpl alarm_morning_flag
+0250 8066       314            sjmp display
+0252            315            
+0252            316   check_alarm_mins:
+0252 20831D     317            jb ALRM_MINS_UP, check_alarm_set
+0255 C002       318            push AR2
+0257 7A50       318            mov R2, #80
+0259 120039     318            lcall ?Wait_Milli_Seconds
+025C D002       318            pop AR2
+025E 208311     319            jb ALRM_MINS_UP, check_alarm_set
+0261 E536       320            mov a, alarm_mins
+0263 B45905     321            cjne a, #59H, add_alarm_min
+0266 E4         322            clr a
+0267 F536       323            mov alarm_mins, a
+0269 80D5       324            sjmp check_alarm_hr
+026B            325   add_alarm_min:
+026B 2401       326            add a, #0x01
+026D D4         327            da a
+026E F536       328            mov alarm_mins, a
+0270 8046       329            sjmp display
+0272            330            
+0272            331   check_alarm_set:
+0272 209310     332            jb ALRM_SET, check_boot
+0275 C002       333            push AR2
+0277 7A50       333            mov R2, #80
+0279 120039     333            lcall ?Wait_Milli_Seconds
+027C D002       333            pop AR2
+027E 209304     334            jb ALRM_SET, check_boot
+0281 B202       335            cpl alarm_flag
+0283 8033       336            sjmp display
+0285            337            
+0285            338   check_boot:
+0285 20C528     339            jb BOOT_BUTTON, loop_a  ; if the 'BOOT' button is not pressed skip
+0288 C002       340            push AR2
+028A 7A32       340            mov R2, #50
+028C 120039     340            lcall ?Wait_Milli_Seconds
+028F D002       340            pop AR2         ; Debounce delay.  This macro is also in 'LCD_4bit.inc'
+0291 20C51C     341            jb BOOT_BUTTON, loop_a  ; if the 'BOOT' button is not pressed skip
+0294 30C5FD     342            jnb BOOT_BUTTON, $              ; Wait for button release.  The '$' means: jump to same instruction.
+0297            343            ; A valid press of the 'BOOT' button has been detected, reset the BCD counter.
+0297            344            ; But first stop timer 2 and reset the milli-seconds counter, to resync everything.
+0297 C2CA       345            clr TR2                 ; Stop timer 2
+0299 E4         346            clr a
+029A            347            
+029A            348            ;Reset milliseconds counter
+029A F530       349            mov Count1ms+0, a
+029C F531       350            mov Count1ms+1, a
+029E            351            
+029E            352            ;Reset current time
+029E F533       353            mov BCD_secs, a
+02A0 F534       354            mov BCD_mins, a
+02A2 F532       355            mov BCD_hrs, a
+02A4            356            
+02A4            357            ;Reset alarm time
+02A4 F535       358            mov alarm_hrs, a
+02A6 F536       359            mov alarm_mins, a
+02A8            360            
+02A8            361            ;Reset flags
+02A8 D201       362            setb morning_flag
+02AA C202       363            clr alarm_flag
+02AC            364            
+02AC D2CA       365            setb TR2                ; Start timer 2
+02AE 8006       366            sjmp loop_b             ; Display the new value
+02B0            367   loop_a:
+02B0 200003     368            jb one_second_flag, loop_b
+02B3 0201EE     369            ljmp loop
+02B6            370   loop_b:
+02B6 C200       371       clr one_second_flag ; We clear this flag in the main loop, but it is set in the ISR for timer 2
+02B8            372   display:    
+02B8            373       ;Display current time
+02B8 C0E0       374            push acc
+02BA 7407       374            mov a, #7
+02BC 14         374            dec a
+02BD 1200BF     374            lcall ?Set_Cursor_1 ; Select column and row
+02C0 D0E0       374            pop acc
+02C2 C000       375            push ar0
+02C4 A832       375            mov r0, BCD_hrs
+02C6 1200C4     375            lcall ?Display_BCD
+02C9 D000       375            pop ar0
+02CB C0E0       376            push acc
+02CD 740A       376            mov a, #10
+02CF 14         376            dec a
+02D0 1200BF     376            lcall ?Set_Cursor_1 ; Select column and row
+02D3 D0E0       376            pop acc
+02D5 C000       377            push ar0
+02D7 A834       377            mov r0, BCD_mins
+02D9 1200C4     377            lcall ?Display_BCD
+02DC D000       377            pop ar0
+02DE C0E0       378            push acc
+02E0 740D       378            mov a, #13
+02E2 14         378            dec a
+02E3 1200BF     378            lcall ?Set_Cursor_1 ; Select column and row
+02E6 D0E0       378            pop acc     
+02E8 C000       379            push ar0
+02EA A833       379            mov r0, BCD_secs
+02EC 1200C4     379            lcall ?Display_BCD
+02EF D000       379            pop ar0 
+02F1            380   
+02F1            381            ;Display alarm time
+02F1 C0E0       382            push acc
+02F3 7407       382            mov a, #7
+02F5 14         382            dec a
+02F6 1200BD     382            lcall ?Set_Cursor_2 ; Select column and row
+02F9 D0E0       382            pop acc
+02FB C000       383            push ar0
+02FD A835       383            mov r0, alarm_hrs
+02FF 1200C4     383            lcall ?Display_BCD
+0302 D000       383            pop ar0
+0304 C0E0       384            push acc
+0306 740A       384            mov a, #10
+0308 14         384            dec a
+0309 1200BD     384            lcall ?Set_Cursor_2 ; Select column and row
+030C D0E0       384            pop acc
+030E C000       385            push ar0
+0310 A836       385            mov r0, alarm_mins
+0312 1200C4     385            lcall ?Display_BCD
+0315 D000       385            pop ar0
+0317            386            
+0317            387            ;Display alarm on/off
+0317 C0E0       388            push acc
+0319 740E       388            mov a, #14
+031B 14         388            dec a
+031C 1200BD     388            lcall ?Set_Cursor_2 ; Select column and row
+031F D0E0       388            pop acc
+0321 C0E0       389            push acc
+0323 746F       389            mov a, #'o'
+0325 12007E     389            lcall ?WriteData
+0328 D0E0       389            pop acc
+032A C0E0       390            push acc
+032C 740F       390            mov a, #15
+032E 14         390            dec a
+032F 1200BD     390            lcall ?Set_Cursor_2 ; Select column and row
+0332 D0E0       390            pop acc
+0334 30021E     391            jnb alarm_flag, alarm_off
+0337 C0E0       392            push acc
+0339 746E       392            mov a, #'n'
+033B 12007E     392            lcall ?WriteData
+033E D0E0       392            pop acc
+0340 C0E0       393            push acc
+0342 7410       393            mov a, #16
+0344 14         393            dec a
+0345 1200BD     393            lcall ?Set_Cursor_2 ; Select column and row
+0348 D0E0       393            pop acc
+034A C0E0       394            push acc
+034C 7420       394            mov a, #' '
+034E 12007E     394            lcall ?WriteData
+0351 D0E0       394            pop acc
+0353 801C       395            sjmp display_AP_alarm
+0355            396   alarm_off:
+0355 C0E0       397            push acc
+0357 7466       397            mov a, #'f'
+0359 12007E     397            lcall ?WriteData
+035C D0E0       397            pop acc
+035E C0E0       398            push acc
+0360 7410       398            mov a, #16
+0362 14         398            dec a
+0363 1200BD     398            lcall ?Set_Cursor_2 ; Select column and row
+0366 D0E0       398            pop acc
+0368 C0E0       399            push acc
+036A 7466       399            mov a, #'f'
+036C 12007E     399            lcall ?WriteData
+036F D0E0       399            pop acc
+0371            400            
+0371            401   display_AP_alarm:
+0371 C0E0       402            push acc
+0373 740C       402            mov a, #12
+0375 14         402            dec a
+0376 1200BD     402            lcall ?Set_Cursor_2 ; Select column and row
+0379 D0E0       402            pop acc
+037B 30030B     403            jnb alarm_morning_flag, set_alarm_pm
+037E C0E0       404            push acc
+0380 7441       404            mov a, #'A'
+0382 12007E     404            lcall ?WriteData
+0385 D0E0       404            pop acc
+0387 8009       405            sjmp display_AP
+0389            406   set_alarm_pm:
+0389 C0E0       407            push acc
+038B 7450       407            mov a, #'P'
+038D 12007E     407            lcall ?WriteData
+0390 D0E0       407            pop acc
+0392            408            
+0392            409   display_AP:      
+0392 C0E0       410            push acc
+0394 740F       410            mov a, #15
+0396 14         410            dec a
+0397 1200BF     410            lcall ?Set_Cursor_1 ; Select column and row
+039A D0E0       410            pop acc
+039C 30010B     411            jnb morning_flag, set_pm
+039F C0E0       412            push acc
+03A1 7441       412            mov a, #'A'
+03A3 12007E     412            lcall ?WriteData
+03A6 D0E0       412            pop acc
+03A8 8009       413            sjmp check_alarm_sound
+03AA            414   set_pm:
+03AA C0E0       415            push acc
+03AC 7450       415            mov a, #'P'
+03AE 12007E     415            lcall ?WriteData
+03B1 D0E0       415            pop acc
+03B3            416            
+03B3            417   check_alarm_sound:
+03B3 E4         418            clr a
+03B4 F5F0       419            mov b, a
+03B6 A201       420            mov c, morning_flag
+03B8 92F0       421            mov b.0, c
+03BA A203       422            mov c, alarm_morning_flag
+03BC 92E0       423            mov acc.0, c
+03BE B5F00F     424            cjne a, b, continue
+03C1            425            
+03C1 E534       426            mov a, BCD_mins
+03C3 B5360A     427            cjne a, alarm_mins, continue
+03C6            428            
+03C6 E532       429            mov a, BCD_hrs
+03C8 B53505     430            cjne a, alarm_hrs, continue
+03CB 300202     431            jnb alarm_flag, continue
+03CE D28C       432            setb TR0  ; Start timer 0
+03D0            433   continue:
+03D0 0201EE     434       ljmp loop
+03D3            435   EN

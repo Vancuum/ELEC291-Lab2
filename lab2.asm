@@ -107,7 +107,7 @@ Timer0_Init:
 	mov RL0, #low(TIMER0_RELOAD)
 	; Enable the timer and interrupts
     setb ET0  ; Enable timer 0 interrupt
-    setb TR0  ; Start timer 0
+    clr TR0  ;Don't want timer to start right away
 	ret
 	
 ;---------------------------------;
@@ -119,7 +119,7 @@ Timer0_ISR:
 	;clr TF0  ; According to the data sheet this is done for us already.
 	
 	;Take this line out so I don't get a headache while debugging
-	;cpl SOUND_OUT ; Connect speaker to P0.2
+	cpl SOUND_OUT ; Connect speaker to P0.2
 	reti
 	
 ;---------------------------------;
@@ -168,7 +168,7 @@ Inc_Done:
 	
 	; 1 second has passed.  Set a flag so the main program knows
 	setb one_second_flag ; Let the main program know one second has passed
-	cpl TR0 ; Enable/disable timer/counter 0. This line creates a beep-silence-beep-silence sound.
+	
 	; Reset to zero the milli-seconds counter, it is a 16-bit variable
 	clr a
 	mov Count1ms+0, a
@@ -258,8 +258,8 @@ main:
 	;Initialize flags. Default is morning, alarm off
 	setb one_second_flag
 	setb morning_flag
-	clr alarm_flag
 	setb alarm_morning_flag
+	clr alarm_flag
 
 	; After initialization the program stays in this 'forever' loop
 loop:
@@ -276,8 +276,10 @@ add_hr:
 	da a
 	mov BCD_hrs, a
 	;Morning flag should be changed whenver the hour hits 12
-	cjne a, #12H, check_mins
+	cjne a, #12H, jump
 	cpl morning_flag
+jump:
+	ljmp display
 	
 check_mins:
 	jb MINS_UP, check_alarm_hrs
@@ -292,6 +294,7 @@ add_min:
 	add a, #0x01
 	da a
 	mov BCD_mins, a
+	ljmp display
 		
 check_alarm_hrs:
 	jb ALRM_HRS_UP, check_alarm_mins
@@ -306,8 +309,9 @@ add_alarm_hr:
 	da a
 	mov alarm_hrs, a
 	;Morning flag should be changed whenver the hour hits 12
-	cjne a, #12H, check_alarm_mins
+	cjne a, #12H, display
 	cpl alarm_morning_flag
+	sjmp display
 	
 check_alarm_mins:
 	jb ALRM_MINS_UP, check_alarm_set
@@ -322,12 +326,14 @@ add_alarm_min:
 	add a, #0x01
 	da a
 	mov alarm_mins, a
+	sjmp display
 	
 check_alarm_set:
 	jb ALRM_SET, check_boot
 	Wait_Milli_Seconds(#80)
 	jb ALRM_SET, check_boot
 	cpl alarm_flag
+	sjmp display
 	
 check_boot:
 	jb BOOT_BUTTON, loop_a  ; if the 'BOOT' button is not pressed skip
@@ -363,7 +369,7 @@ loop_a:
 	ljmp loop
 loop_b:
     clr one_second_flag ; We clear this flag in the main loop, but it is set in the ISR for timer 2
-    
+display:    
     ;Display current time
     Set_Cursor(1,7)
 	Display_BCD(BCD_hrs)
@@ -409,18 +415,21 @@ set_pm:
 	Display_char(#'P')
 	
 check_alarm_sound:
-	clr c
-	mov a, morning_flag
-	cjne a, alarm_morning_flag, continue
-	jnz continue
-	clr c
+	clr a
+	mov b, a
+	mov c, morning_flag
+	mov b.0, c
+	mov c, alarm_morning_flag
+	mov acc.0, c
+	cjne a, b, continue
+	
 	mov a, BCD_mins
 	cjne a, alarm_mins, continue
-	clr c
+	
 	mov a, BCD_hrs
 	cjne a, alarm_hrs, continue
 	jnb alarm_flag, continue
-	setb SOUND_OUT ;Connect speaker to P0.2 
+	setb TR0  ; Start timer 0
 continue:
     ljmp loop
 END

@@ -16,10 +16,12 @@ TIMER0_RELOAD EQU ((65536-(CLK/TIMER0_RATE)))
 TIMER2_RATE   EQU 1000     ; 1000Hz, for a timer tick of 1ms
 TIMER2_RELOAD EQU ((65536-(CLK/TIMER2_RATE)))
 
+;Symbolic constants for pushbuttons on breadboard
 BOOT_BUTTON   equ P4.5
 SOUND_OUT     equ P0.2
 HRS_UP        equ P2.0
 MINS_UP		  equ P2.3
+SECS_UP 	  equ P2.5
 ALRM_MINS_UP  equ P0.3
 ALRM_HRS_UP   equ P0.6
 ALRM_SET      equ P1.3
@@ -118,7 +120,6 @@ Timer0_Init:
 Timer0_ISR:
 	;clr TF0  ; According to the data sheet this is done for us already.
 	
-	;Take this line out so I don't get a headache while debugging
 	cpl SOUND_OUT ; Connect speaker to P0.2
 	reti
 	
@@ -214,6 +215,7 @@ inc_hrs:
 	;Morning flag should be changed whenver the hour hits 12
 	cjne a, #12H, Timer2_ISR_done
 	cpl morning_flag
+	
 Timer2_ISR_done:
 	pop psw
 	pop acc
@@ -263,10 +265,11 @@ main:
 
 	; After initialization the program stays in this 'forever' loop
 loop:
-	;Check if LCD screen is being configured
+	;Check if hours are being incremented through buttons
 	jb HRS_UP, check_mins
 	Wait_Milli_Seconds(#80)
 	jb HRS_UP, check_mins
+	;Check if hours have overflowed
 check_hr:
 	mov a, BCD_hrs
 	cjne a, #12H, add_hr
@@ -281,19 +284,36 @@ add_hr:
 jump:
 	ljmp display
 	
+	;Check if minutes are being incremented through pushbutton
 check_mins:
-	jb MINS_UP, check_alarm_hrs
+	jb MINS_UP, check_secs
 	Wait_Milli_Seconds(#80)
-	jb MINS_UP, check_alarm_hrs
+	jb MINS_UP, check_secs
+mins_ovf:	
 	mov a, BCD_mins
 	cjne a, #59H, add_min
 	clr a
 	mov BCD_mins, a
-	sjmp add_hr
+	sjmp check_hr
 add_min:
 	add a, #0x01
 	da a
 	mov BCD_mins, a
+	ljmp display
+	
+check_secs:
+	jb SECS_UP, check_alarm_hrs
+	Wait_Milli_Seconds(#80)
+	jb SECS_UP, check_alarm_hrs
+	mov a, BCD_secs
+	cjne a, #59H, add_sec
+	clr a
+	mov BCD_secs, a
+	sjmp mins_ovf
+add_sec:
+	add a, #0x01
+	da a
+	mov BCD_secs, a
 	ljmp display
 		
 check_alarm_hrs:
@@ -332,6 +352,7 @@ check_alarm_set:
 	jb ALRM_SET, check_boot
 	Wait_Milli_Seconds(#80)
 	jb ALRM_SET, check_boot
+	jnb ALRM_SET, $ ;Wait until button is released
 	cpl alarm_flag
 	sjmp display
 	
@@ -414,6 +435,11 @@ display_AP:
 set_pm:
 	Display_char(#'P')
 	
+	;Check to see if the alarm should be turned on. Conditions to be met:
+	;1. Alarm and actual time are both AM or both PM
+	;2. Alarm and actual mins are the same
+	;3. Alarm and actual hours are the same
+	;4. Alarm is activated
 check_alarm_sound:
 	clr a
 	mov b, a
@@ -421,15 +447,18 @@ check_alarm_sound:
 	mov b.0, c
 	mov c, alarm_morning_flag
 	mov acc.0, c
-	cjne a, b, continue
+	cjne a, b, alarm_sound_off
 	
 	mov a, BCD_mins
-	cjne a, alarm_mins, continue
+	cjne a, alarm_mins, alarm_sound_off
 	
 	mov a, BCD_hrs
-	cjne a, alarm_hrs, continue
-	jnb alarm_flag, continue
+	cjne a, alarm_hrs, alarm_sound_off
+	jnb alarm_flag, alarm_sound_off
 	setb TR0  ; Start timer 0
+	sjmp continue
+alarm_sound_off:
+	clr TR0
 continue:
     ljmp loop
 END
